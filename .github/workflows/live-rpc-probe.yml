@@ -2,36 +2,48 @@ name: Live Base RPC Probe
 
 on:
   push:
-    branches: [flashbot-agent]
-  pull_request:
     branches: [main]
+    paths-ignore:
+      - 'agent/live_result.json'
+  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   live-rpc:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Query Base chain id
-        shell: bash
-        run: |
-          set -euo pipefail
-          RESPONSE=$(curl --fail-with-body --silent --show-error --max-time 15 \
-            -H 'content-type: application/json' \
-            --data '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' \
-            https://mainnet.base.org)
-          echo "CHAIN_RESPONSE=$RESPONSE"
-          echo "$RESPONSE" | grep -q '"result":"0x2105"'
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
 
-      - name: Query live Base block number
+      - name: Query Base mainnet live RPC
         shell: bash
         run: |
-          set -euo pipefail
-          RESPONSE=$(curl --fail-with-body --silent --show-error --max-time 15 \
-            -H 'content-type: application/json' \
-            --data '{"jsonrpc":"2.0","id":2,"method":"eth_blockNumber","params":[]}' \
-            https://mainnet.base.org)
-          echo "LIVE_BLOCK_RESPONSE=$RESPONSE"
-          echo "$RESPONSE" | grep -Eq '"result":"0x[0-9a-fA-F]+"'
+          set +e
+          python3 agent/live_rpc_probe.py > agent/live_result.json
+          STATUS=$?
+          cat agent/live_result.json
+          echo "PROBE_STATUS=$STATUS" >> "$GITHUB_ENV"
+          exit 0
+
+      - name: Commit live result
+        shell: bash
+        run: |
+          git config user.name 'chatgpt-live-agent'
+          git config user.email 'actions@users.noreply.github.com'
+          git add agent/live_result.json
+          if git diff --cached --quiet; then
+            echo 'No result change'
+          else
+            git commit -m 'Update live Base RPC result [skip ci]'
+            git push origin main
+          fi
+
+      - name: Fail if RPC probe failed
+        shell: bash
+        run: |
+          test "${PROBE_STATUS:-1}" = "0"
