@@ -1,0 +1,35 @@
+name: Live Base RPC Probe
+
+on:
+  push:
+    branches: [flashbot-agent]
+    paths:
+      - 'agent/**'
+      - '.github/workflows/live-rpc-probe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-rpc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python version
+        run: python3 --version
+
+      - name: Query Base mainnet live RPC
+        run: |
+          python3 agent/live_rpc_probe.py | tee live_result.json
+
+      - name: Add result to workflow summary
+        if: always()
+        run: |
+          echo '## Live Base RPC result' >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat live_result.json >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
