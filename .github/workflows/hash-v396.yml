@@ -1,0 +1,24 @@
+name: Hash V396
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  hash-v396:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compute daemon SHA256
+        shell: bash
+        run: sha256sum flashbot/releases/v3.9.6/daemon.py | awk '{print $1}' > flashbot/releases/v3.9.6/daemon.sha256.txt
+      - name: Persist hash result
+        shell: bash
+        run: |
+          git config user.name "flashbot-ci"
+          git config user.email "flashbot-ci@users.noreply.github.com"
+          git add flashbot/releases/v3.9.6/daemon.sha256.txt
+          if ! git diff --cached --quiet; then
+            git commit -m "flashbot: persist v3.9.6 daemon sha256"
+            git push
+          fi
