@@ -3,12 +3,8 @@ name: Live Base RPC Probe
 on:
   push:
     branches: [flashbot-agent]
-    paths:
-      - 'agent/**'
-      - '.github/workflows/live-rpc-probe.yml'
   pull_request:
     branches: [main]
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -18,20 +14,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Python version
-        run: python3 --version
-
-      - name: Query Base mainnet live RPC
+      - name: Query Base chain id
+        shell: bash
         run: |
-          python3 agent/live_rpc_probe.py | tee live_result.json
+          set -euo pipefail
+          RESPONSE=$(curl --fail-with-body --silent --show-error --max-time 15 \
+            -H 'content-type: application/json' \
+            --data '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' \
+            https://mainnet.base.org)
+          echo "CHAIN_RESPONSE=$RESPONSE"
+          echo "$RESPONSE" | grep -q '"result":"0x2105"'
 
-      - name: Add result to workflow summary
-        if: always()
+      - name: Query live Base block number
+        shell: bash
         run: |
-          echo '## Live Base RPC result' >> "$GITHUB_STEP_SUMMARY"
-          echo '```json' >> "$GITHUB_STEP_SUMMARY"
-          cat live_result.json >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          set -euo pipefail
+          RESPONSE=$(curl --fail-with-body --silent --show-error --max-time 15 \
+            -H 'content-type: application/json' \
+            --data '{"jsonrpc":"2.0","id":2,"method":"eth_blockNumber","params":[]}' \
+            https://mainnet.base.org)
+          echo "LIVE_BLOCK_RESPONSE=$RESPONSE"
+          echo "$RESPONSE" | grep -Eq '"result":"0x[0-9a-fA-F]+"'
