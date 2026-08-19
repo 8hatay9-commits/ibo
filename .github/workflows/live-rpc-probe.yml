@@ -6,6 +6,8 @@ on:
     paths:
       - 'agent/**'
       - '.github/workflows/live-rpc-probe.yml'
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
