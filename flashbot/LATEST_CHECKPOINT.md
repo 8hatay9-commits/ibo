@@ -1,6 +1,6 @@
 # Flashbot Latest Checkpoint
 
-Updated: 2026-08-19 07:13:24 +03:00
+Updated: 2026-08-19 07:37:39 +03:00
 Host: DESKTOP-431STAP
 Controller: FLASHBOT-CONTROLLER-V3
 Mode: DRY_RUN_ONLY
@@ -16,34 +16,34 @@ Verified profit: USD 0
 - Do not spend the scarce USD 50 gas budget on blind deployment, reverts, or unverified execution.
 - Keep signing/private keys local to the PC when the execution layer is eventually enabled; never put private keys in Gmail, GitHub, or chat.
 
-## Current verified runtime
-- Active release: v3.8.4
-- Engine: FLASHBOT-PRODUCTION-V3.8.4
-- Daemon: RUNNING, PID 14344, started 2026-08-19 07:12:55 +03:00
-- Backfill: STOPPED to prioritize live search
+## Current verified dual runtime
+- Search engine: FLASHBOT-PRODUCTION-V3.8.4
+- Arbitrage daemon: RUNNING, PID 4560, started 2026-08-19 07:37:00 +03:00
+- Aave liquidation watcher: RUNNING as controller backfill process, PID 17300, started 2026-08-19 07:35:49 +03:00
+- Release carrying watcher: v3.9.0, SHA-verified by controller
 - Feed: HTTP_PENDING_SWAP_LOGS_ADAPTIVE_DECOUPLED_V37
-- Connected: true
 - Pool count: 1,801,027
-- Feed RPC latency: 209.06 ms
-- Feed target: 220 ms
 - Queue policy: LATEST_STATE_COALESCE_CAP1
 - Queue depth: 1
-- Last error: null
-- PancakeSwap V3 enabled: true
-- Cost gate: V37_CONSERVATIVE_L1_L2_ESTIMATE
-- WSS on this host/path remains disabled after V3.6.1 diagnostics returned Cloudflare HTTP 405; Base Flashblocks HTTP pending Swap-log fallback is active.
+- Latest feed RPC latency: 229.98 ms
+- Daemon last_error: null
+- Watcher last_error: null
 
-## V3.8 progression
-- V3.8.2 added a self-supervisor so the daemon can restart its worker after crashes with backoff/crash-loop protection.
-- V3.8.2 exposed a critical FIFO problem: queue depth hit 256 and 397 feed batches were dropped while stale pending state accumulated.
-- V3.8.3 changed the feed queue to capacity 1 with latest-state coalescing. Verified queue depth fell to 1 while feed latency stayed around 216-232 ms.
-- V3.8.3 then exposed the next bottleneck: known pool hits occurred but route generation/quoting was too slow on the 1.8M-pool SQLite registry.
-- V3.8.4 bounded topology fanout and shortened the route requote TTL while preserving the queue/supervisor architecture.
-- First verified V3.8.4 status (29 seconds after start): 75 feed messages, 8 processed logs, 1 known-pool hit, 48 structural candidates, 6 exact quote attempts, queue depth 1, last_error null.
-- Best V3.8.4 edge in that first sample: -5.0549 bps gross on a 2-pool Uniswap V3 USDC/WETH round trip; after the 5 bps Aave flash premium it was -10.0549 bps before gas. Not profitable and must not be executed.
+## Arbitrage lane
+- Latest verified restart sample: 74 feed messages, 97 logs, 24 known-pool hits, 218 structural candidates, 3 exact quote attempts.
+- No gross-positive candidate and no positive-after-flash candidate.
+- Best current observed edge: -4.9185 bps gross on a 2-pool Uniswap V3 USDC/WETH round trip; after 5 bps Aave premium it is -9.9185 bps before gas. Not executable.
 
-## Next engineering priority
-Use pending Swap-event state as a cheap price/edge prefilter so the engine does not spend SQLite/RPC work on routes that cannot plausibly clear fees. Exact on-chain quoting and atomic simulation remain the correctness gate. Prioritize fresh state over breadth; stale pending-state work has no MEV value.
+## Aave liquidation lane
+- Batched borrower discovery scans recent 12,000 Base blocks and pending-state account data.
+- Watcher refresh #2 had 349 recent Borrow events and had completed 291 live HF polls with zero liquidatable positions and no error.
+- Lowest current HF: 1.0099971529 for 0x6a2cc7efa2c5d91c45411d956358928158262a19. This user has ~0.0750 WETH collateral and ~0.06164 WETH debt; economically small.
+- Most economically interesting near-liquidation account: 0x9f9ff4ffdf0b16dd096f649586e882d88a9bf1c0, HF 1.0319272236, 35.3459169922 cbETH collateral and 37.0104394404 WETH debt.
+- The cbETH collateral liquidation bonus is 7.5%; protocol fee is 10% of the bonus, giving an estimated effective liquidator bonus of 6.75% before flash premium, swap/slippage, L1/L2 gas, and competition.
+- If that account becomes liquidatable while HF remains above 0.95, Aave V3 close factor is 50%; approximate debt cover is USD 35.35k and gross liquidator bonus is about USD 2.386k before execution costs. This is a conditional opportunity, not current profit.
+- If HF falls to or below 0.95, Aave V3 source code permits a 100% close factor; still requires exact pending-state simulation and execution-cost proof.
+- Third tracked account: 0xfeee2af72cd54577526a3e8a6508a9d8d0942fb8, HF ~1.04665, ~4981.29 USDC collateral and ~3712.23 USDC debt, effective bonus estimate 4.5%; smaller but may be economically viable if it crosses HF < 1.
+- Current liquidatable_now count: 0. No liquidation should be broadcast.
 
 ## Financial safety gate
 Do not enable wallet signing, live broadcast, or spend the USD 50 gas budget until a candidate passes all of:
@@ -51,10 +51,13 @@ Do not enable wallet signing, live broadcast, or spend the USD 50 gas budget unt
 2. exact/credible Base L2 execution gas
 3. L1 security/data fee
 4. slippage + safety buffer
-5. atomic pending-state simulation via eth_simulateV1 or equivalent verified method
+5. atomic pending-state simulation
 6. net positive after flash premium and all costs
 
-Large flash-loan notionals may be simulated, but larger notional is not automatically more profitable. No live flash borrowing/execution until this gate passes and the user explicitly confirms live execution.
+## Next engineering priorities
+1. Keep arbitrage daemon and liquidation watcher running in parallel.
+2. Add liquidation-specific atomic simulation path: flash-borrow debt asset -> Aave liquidationCall -> seize collateral -> exact swap to debt asset -> repay flash loan -> compute final net USD.
+3. Only after this path is proven net-positive should isolated signing/live broadcast be considered.
 
 ## Context continuity
-This file plus MASTER_STATE.json / MASTER_STATE.md and Gmail FLASHBOT result messages are canonical context. If a ChatGPT thread freezes or becomes too long, load these sources and continue from the latest verified checkpoint instead of reconstructing from memory or asking the user where the project stopped.
+This file plus MASTER_STATE.json / MASTER_STATE.md and Gmail FLASHBOT result messages are canonical context. If a ChatGPT thread freezes or becomes too long, load these sources and continue from this checkpoint instead of reconstructing from memory or asking the user where the project stopped.
