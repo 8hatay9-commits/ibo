@@ -1,0 +1,14 @@
+{
+  "files": [
+    {"name": "backfill.py", "sha256": "f0dd227d03bb83335e9acb57ef2993962b107fbf76ed3b03068f592c021cdcbf"},
+    {"name": "daemon.py", "sha256": "1db6632c0e2c9043174986bab4b46adc621fe3fae3c877bcad8c36e16bed3772"},
+    {"name": "db.py", "sha256": "41d21408376b51755fca2b8b4943ce3aff5a50000ed798a56faf479e96ec6bd6"},
+    {"name": "probe.py", "sha256": "6f2ac81f9a8c3df49d3dc75a2b11ee66a6b4f04b278c5986ceb7168df6521f4d"},
+    {"name": "rpc.py", "sha256": "434162418dd2257d98ef49a9bd60e10886bc4f65c90393919856027db2c3dd2e"},
+    {"name": "settings.json", "sha256": "6e8abc4e86441d5d740aa66a3864a4929c69f74d969890039ffce5692a7b6a0e"},
+    {"name": "status.py", "sha256": "db54d87fed7b4019ed9dd60f021cdac12dfe6dae0a510dee648dea9cd236a90a"},
+    {"name": "ws.py", "sha256": "fe05b19878af6ce7c5a4497fccbab0f2d36be5ed78819a50437b690e26149373"}
+  ],
+  "release_id": "v3.0.1",
+  "version": "FLASHBOT-PRODUCTION-V3.0.1"
+}
