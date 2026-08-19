@@ -36,6 +36,7 @@ def parse_uni(log,venue,factory):
 
 def parse_aero_v2(log,factory):
     t=log.get("topics") or []; w=words(log.get("data"))
+    # PoolCreated(address indexed token0,address indexed token1,bool indexed stable,address pool,uint256)
     if len(t)!=4 or len(w)<2:return 0
     stable=int(t[3],16)
     if stable not in (0,1):return 0
@@ -60,7 +61,8 @@ def scan_factory(factory,venue,parser):
             pos=end+1; db.set_progress(key,pos)
             if len(logs or [])<200: chunk=min(mx,int(chunk*1.4))
             db.set_progress(key+":chunk",chunk)
-        except Exception:
+        except Exception as e:
+            msg=str(e).lower()
             if chunk>mn:
                 chunk=max(mn,chunk//2); db.set_progress(key+":chunk",chunk); continue
             raise
@@ -75,6 +77,7 @@ def main():
         results.append(scan_factory(f,"uniswap_v3",parse_uni))
     for f in cfg["factories"]["aerodrome_slipstream"]:
         if STOP.exists():break
+        # Slipstream factory is Uniswap-V3-style; only exact PoolCreated selector is accepted.
         results.append(scan_factory(f,"aerodrome_slipstream",parse_uni))
     for f in cfg["factories"]["aerodrome_v2"]:
         if STOP.exists():break
@@ -82,4 +85,5 @@ def main():
     out={"ok":True,"type":"V3_BACKFILL","pool_count":db.count_pools(),"results":results,"stopped":STOP.exists(),"timestamp":time.time()}
     (ROOT/"backfill_report.json").write_text(json.dumps(out,indent=2),encoding="utf-8")
     print(json.dumps(out,indent=2))
-if __name__=="__main__":main()
+if __name__=="__main__":
+    main()
