@@ -1,0 +1,2 @@
+Trigger Hash V396 workflow after v3.9.6 exact-hash staging.
+Timestamp: 2026-08-19T17:10:00+03:00
