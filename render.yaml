@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: flashbot-cloud-v4
+    runtime: node
+    rootDir: flashbot/cloud-v4
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    autoDeploy: false
