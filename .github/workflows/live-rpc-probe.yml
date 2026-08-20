@@ -1,50 +1,63 @@
 name: Live Base RPC Probe
 
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - 'agent/live_result.json'
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: live-base-rpc-probe
+  cancel-in-progress: true
 
 jobs:
   live-rpc:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 3
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Query Base mainnet live RPC
+      - name: Probe Base RPC with failover
         shell: bash
         run: |
-          set +e
-          python3 agent/live_rpc_probe.py > agent/live_result.json
-          STATUS=$?
-          cat agent/live_result.json
-          echo "PROBE_STATUS=$STATUS" >> "$GITHUB_ENV"
-          exit 0
+          python3 - <<'PY'
+          import json, time, urllib.request
 
-      - name: Commit live result on main push
-        if: github.event_name == 'push'
-        shell: bash
-        run: |
-          git config user.name 'chatgpt-live-agent'
-          git config user.email 'actions@users.noreply.github.com'
-          git add agent/live_result.json
-          if git diff --cached --quiet; then
-            echo 'No result change'
-          else
-            git commit -m 'Update live Base RPC result [skip ci]'
-            git push origin HEAD:main
-          fi
+          rpcs = [
+              "https://mainnet.base.org",
+              "https://mainnet-preconf.base.org",
+          ]
 
-      - name: Fail if RPC probe failed
-        shell: bash
-        run: |
-          test "${PROBE_STATUS:-1}" = "0"
+          def call(url, method):
+              body = json.dumps({"jsonrpc":"2.0","id":1,"method":method,"params":[]}).encode()
+              req = urllib.request.Request(url, data=body, headers={"Content-Type":"application/json","User-Agent":"ibo-live-probe/2.0"}, method="POST")
+              with urllib.request.urlopen(req, timeout=12) as r:
+                  data = json.loads(r.read().decode())
+              if data.get("error"):
+                  raise RuntimeError(data["error"])
+              return data["result"]
+
+          errors = []
+          for url in rpcs:
+              for attempt in range(1, 4):
+                  started = time.perf_counter()
+                  try:
+                      chain_id = int(call(url, "eth_chainId"), 16)
+                      block = int(call(url, "eth_blockNumber"), 16)
+                      gas = int(call(url, "eth_gasPrice"), 16)
+                      if chain_id != 8453:
+                          raise RuntimeError(f"unexpected chain id {chain_id}")
+                      print(json.dumps({
+                          "status": "PASS",
+                          "rpc": url,
+                          "chain_id": chain_id,
+                          "block_number": block,
+                          "gas_price_wei": gas,
+                          "latency_ms": round((time.perf_counter()-started)*1000, 1),
+                      }, indent=2))
+                      raise SystemExit(0)
+                  except Exception as exc:
+                      errors.append({"rpc": url, "attempt": attempt, "error": repr(exc)})
+                      time.sleep(attempt)
+
+          print(json.dumps({"status":"FAIL","errors":errors}, indent=2))
+          raise SystemExit(1)
+          PY
