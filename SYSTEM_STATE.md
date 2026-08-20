@@ -21,6 +21,17 @@ Run a cloud-hosted, PC-free, read-only Base mainnet scanner with a live health e
 - Signing: disabled.
 - Broadcast: disabled.
 
+## Zero-backend fallback dashboard
+A browser-only live Base health dashboard now exists at `live/index.html`.
+It does not require GitHub Actions, Vercel, Render, or any server-side runtime.
+The page queries live Base JSON-RPC directly every 15 seconds with failover across:
+- `https://mainnet.base.org`
+- `https://mainnet-preconf.base.org`
+- `https://base-rpc.publicnode.com`
+It proves chain ID, block number, gas price, RPC latency, selected RPC, observation timestamp, and keeps signing/broadcast disabled.
+Latest dashboard commit: `55344f48ca692acf1fe5e29f7d4cbcd7533dd03c`.
+This is a fallback health surface, not a replacement for the full `/api/aave` server-side scanner.
+
 ## GitHub Actions incident
 Multiple workflows failed before any step started. Jobs returned zero steps and log download returned `BlobNotFound`. This means failures occurred at GitHub hosted-runner/job provisioning level, before checkout/scripts/RPC code executed.
 
@@ -47,11 +58,12 @@ The available Vercel deploy connector currently rejects deployment because its b
 GitHub CI notification emails arrive in the connected Gmail inbox. These confirmed failures such as Hash V396 and Base Live Proof V2 dying in 2–4 seconds before steps began. Gmail is evidence/notification only, not the compute plane.
 
 ## Next execution objective
-1. Obtain a cloud deploy surface that can actually be written from the current tool environment (Vercel once create/deploy API is usable, Cloudflare if connected, or another connected hosting provider).
-2. Deploy the canonical `flashbot/cloud-v4` app without GitHub Actions.
-3. Independently fetch `/api/health`.
-4. Accept production only if response proves `chainId: 8453`, current block number, gas price, RPC latency, timestamp, and `signingEnabled:false`, `broadcastEnabled:false`.
-5. Then verify `/api/aave` and dashboard.
+1. Use the zero-backend dashboard as the immediate live Base health surface.
+2. Obtain a cloud deploy surface that can actually be written from the current tool environment (Vercel once create/deploy API is usable, Cloudflare if connected, or another connected hosting provider).
+3. Deploy the canonical `flashbot/cloud-v4` app without GitHub Actions.
+4. Independently fetch `/api/health`.
+5. Accept production only if response proves `chainId: 8453`, current block number, gas price, RPC latency, timestamp, and `signingEnabled:false`, `broadcastEnabled:false`.
+6. Then verify `/api/aave` and dashboard.
 
 ## Truth rule
 Never report LIVE/PASS from configuration alone. LIVE requires an externally fetched HTTP response from the deployed endpoint with current Base mainnet evidence.
