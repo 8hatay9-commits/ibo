@@ -1,0 +1,65 @@
+name: Base Live Proof V2
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'agent/live_result_v2.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Query Base Flashblocks and publish proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          RPC='https://mainnet-preconf.base.org'
+          CHAIN=$(curl -fsS --max-time 10 -H 'content-type: application/json' --data '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' "$RPC")
+          BLOCK=$(curl -fsS --max-time 10 -H 'content-type: application/json' --data '{"jsonrpc":"2.0","id":2,"method":"eth_getBlockByNumber","params":["pending",false]}' "$RPC")
+          export CHAIN BLOCK
+          python3 - <<'PY' > /tmp/live_result_v2.json
+          import json,os,time
+          chain=json.loads(os.environ['CHAIN'])
+          block=json.loads(os.environ['BLOCK'])
+          if chain.get('error'): raise SystemExit('chain rpc error: '+json.dumps(chain['error']))
+          if block.get('error'): raise SystemExit('block rpc error: '+json.dumps(block['error']))
+          b=block['result']
+          out={
+            'ok': True,
+            'source': 'github-actions-direct-rpc',
+            'rpc': 'https://mainnet-preconf.base.org',
+            'chain_id': int(chain['result'],16),
+            'pending_block': int(b['number'],16),
+            'pending_timestamp': int(b['timestamp'],16),
+            'block_hash': b.get('hash'),
+            'observed_at_unix': time.time(),
+            'mode': 'READ_ONLY'
+          }
+          print(json.dumps(out,indent=2,sort_keys=True))
+          PY
+          cat /tmp/live_result_v2.json
+
+          API="https://api.github.com/repos/${GITHUB_REPOSITORY}/contents/agent/live_result_v2.json"
+          SHA=$(curl -fsS -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' "${API}?ref=main" 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("sha",""))' || true)
+          CONTENT=$(base64 -w0 /tmp/live_result_v2.json)
+          export CONTENT SHA
+          python3 - <<'PY' > /tmp/put.json
+          import json,os
+          p={'message':'agent: update live Base proof v2 [skip ci]','content':os.environ['CONTENT'],'branch':'main'}
+          if os.environ.get('SHA'): p['sha']=os.environ['SHA']
+          print(json.dumps(p,separators=(',',':')))
+          PY
+          curl -fsS -X PUT -H "Authorization: Bearer ${GH_TOKEN}" -H 'Accept: application/vnd.github+json' -H 'Content-Type: application/json' --data-binary @/tmp/put.json "$API" >/tmp/put_response.json
+          python3 - <<'PY'
+          import json
+          o=json.load(open('/tmp/put_response.json'))
+          print('published_commit',o.get('commit',{}).get('sha'))
+          PY
