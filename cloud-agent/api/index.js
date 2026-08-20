@@ -1,0 +1,1 @@
+export default function handler(req,res){res.setHeader('cache-control','no-store');res.status(200).json({ok:true,name:'CHAIN_HUNTER_AGENT',version:'1.0.0',mode:'READ_ONLY_VERIFIED',chain:8453,endpoints:['/api/live','/api/aave-near'],rules:{signing:false,broadcast:false,require_evidence:true}});}
