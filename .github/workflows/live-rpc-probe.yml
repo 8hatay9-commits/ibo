@@ -1,50 +1,24 @@
 name: Live Base RPC Probe
 
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - 'agent/live_result.json'
   pull_request:
     branches: [main]
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   live-rpc:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 2
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Query Base mainnet live RPC
+      - name: Prove runner and Base RPC without checkout
         shell: bash
         run: |
-          set +e
-          python3 agent/live_rpc_probe.py > agent/live_result.json
-          STATUS=$?
-          cat agent/live_result.json
-          echo "PROBE_STATUS=$STATUS" >> "$GITHUB_ENV"
-          exit 0
-
-      - name: Commit live result on main push
-        if: github.event_name == 'push'
-        shell: bash
-        run: |
-          git config user.name 'chatgpt-live-agent'
-          git config user.email 'actions@users.noreply.github.com'
-          git add agent/live_result.json
-          if git diff --cached --quiet; then
-            echo 'No result change'
-          else
-            git commit -m 'Update live Base RPC result [skip ci]'
-            git push origin HEAD:main
-          fi
-
-      - name: Fail if RPC probe failed
-        shell: bash
-        run: |
-          test "${PROBE_STATUS:-1}" = "0"
+          set -euo pipefail
+          echo "RUNNER_OK $(date -u +%FT%TZ)"
+          curl --fail --show-error --silent --max-time 15 \
+            -H 'content-type: application/json' \
+            --data '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}' \
+            https://mainnet.base.org
