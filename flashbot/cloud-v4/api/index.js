@@ -1,0 +1,1 @@
+export default function handler(req,res){res.status(200).json({ok:true,agent:'FLASHBOT-CLOUD-V4',mode:'READ_ONLY',endpoints:['/api/live','/api/liquidations?lookback=1200&max_users=60'],rule:'No EXECUTE verdict without exact simulation and positive net profit after all costs.'})}
