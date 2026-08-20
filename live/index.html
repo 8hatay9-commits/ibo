@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Flashbot Live Base Dashboard</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;background:#0a0f16;color:#eaf1f8;margin:0;padding:16px}.wrap{max-width:960px;margin:auto}.card{background:#111925;border:1px solid #26364a;border-radius:16px;padding:16px;margin:12px 0}.ok{color:#58e08b}.bad{color:#ff7d7d}.muted{color:#9eb0c4}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}.metric{background:#0d141e;border:1px solid #1e2b3b;border-radius:12px;padding:12px}.v{font-size:1.35rem;font-weight:700;margin-top:6px;word-break:break-word}button{background:#eaf1f8;color:#081019;border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}pre{white-space:pre-wrap;word-break:break-word;font-size:12px}.pill{display:inline-block;padding:4px 9px;border-radius:999px;background:#172230;margin-right:6px}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}</style>
+</head>
+<body><div class="wrap">
+<h2>Flashbot Live · Base</h2>
+<div class="row"><span class="pill">READ ONLY</span><span class="pill">NO SIGNING</span><span class="pill">NO BROADCAST</span><button id="refresh">Yenile</button></div>
+<div id="status" class="card">Bağlanıyor…</div>
+<div class="grid">
+ <div class="metric"><div class="muted">Chain ID</div><div id="chain" class="v">-</div></div>
+ <div class="metric"><div class="muted">Block</div><div id="block" class="v">-</div></div>
+ <div class="metric"><div class="muted">Gas (wei)</div><div id="gas" class="v">-</div></div>
+ <div class="metric"><div class="muted">RPC latency</div><div id="lat" class="v">-</div></div>
+</div>
+<div class="card"><b>RPC failover</b><pre id="rpcLog">-</pre></div>
+<div class="card"><b>Son gözlem</b><pre id="raw">-</pre></div>
+</div>
+<script>
+const RPCS=['https://mainnet.base.org','https://mainnet-preconf.base.org'];
+let rid=0;
+async function call(url,method,params=[]){const t=performance.now();const c=new AbortController();const to=setTimeout(()=>c.abort(),7000);try{const r=await fetch(url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:++rid,method,params}),signal:c.signal,cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);const j=await r.json();if(j.error)throw new Error(j.error.message||JSON.stringify(j.error));return {result:j.result,ms:Math.round(performance.now()-t)}}finally{clearTimeout(to)}}
+async function rpc(method,params=[]){const errs=[];for(const url of RPCS){try{return {...await call(url,method,params),url}}catch(e){errs.push(url+' => '+(e?.message||e))}}throw new Error(errs.join('\n'))}
+const hex=n=>Number(BigInt(n));
+async function run(){const status=document.getElementById('status'), log=document.getElementById('rpcLog');status.className='card';status.textContent='Canlı Base RPC doğrulanıyor…';log.textContent='-';try{const t=Date.now();const [c,b,g]=await Promise.all([rpc('eth_chainId'),rpc('eth_blockNumber'),rpc('eth_gasPrice')]);const chainId=hex(c.result), block=hex(b.result), gas=BigInt(g.result).toString();document.getElementById('chain').textContent=chainId;document.getElementById('block').textContent=block.toLocaleString('tr-TR');document.getElementById('gas').textContent=gas;document.getElementById('lat').textContent=Math.max(c.ms,b.ms,g.ms)+' ms';log.textContent=['chain: '+c.url+' ('+c.ms+' ms)','block: '+b.url+' ('+b.ms+' ms)','gas: '+g.url+' ('+g.ms+' ms)'].join('\n');const out={ok:chainId===8453,chain:'base',chainId,blockNumber:block,gasPriceWei:gas,rpcLatencyMs:{chain:c.ms,block:b.ms,gas:g.ms},rpc:{chain:c.url,block:b.url,gas:g.url},signingEnabled:false,broadcastEnabled:false,observedAt:new Date().toISOString(),roundTripMs:Date.now()-t};document.getElementById('raw').textContent=JSON.stringify(out,null,2);status.className='card '+(out.ok?'ok':'bad');status.textContent=out.ok?'CANLI · BASE MAINNET DOĞRULANDI':'YANLIŞ CHAIN ID: '+chainId;}catch(e){status.className='card bad';status.textContent='RPC BAĞLANTI HATASI';log.textContent=String(e?.message||e);document.getElementById('raw').textContent=JSON.stringify({ok:false,error:String(e?.message||e),observedAt:new Date().toISOString()},null,2)}}
+document.getElementById('refresh').onclick=run;run();setInterval(run,15000);
+</script></body></html>
