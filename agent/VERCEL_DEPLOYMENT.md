@@ -1,7 +1,11 @@
 # Temporary live-agent deployment probe
 
-Temporary URL for browser verification:
+Flashbot Cloud v4 preview endpoint for independent browser verification:
 
-https://live-chain-agent-5f5ge6jwy-8hatay9-9554s-projects.vercel.app/api/live
+https://flashbot-cloud-v4-6y70lj8en-8hatay9-9554s-projects.vercel.app/api/health
 
-This endpoint is read-only. It does not hold a wallet, private key, or transaction-signing capability.
+Dashboard:
+
+https://flashbot-cloud-v4-6y70lj8en-8hatay9-9554s-projects.vercel.app/
+
+This deployment is read-only. It has no wallet, private key, signing capability, or transaction broadcast enabled.
