@@ -1,0 +1,68 @@
+name: "Watch Expensify 99041"
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: watch-expensify-99041
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    if: github.event_name != 'issue_comment' || github.event.issue.number == 8
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    env:
+      WATCH_ISSUE: "8"
+      TARGET_REPO: "Expensify/App"
+      TARGET_ISSUE: "99041"
+      USER_LOGIN: "8hatay9-commits"
+    steps:
+      - name: Poll target issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          target="$(gh api "repos/${TARGET_REPO}/issues/${TARGET_ISSUE}")"
+          updated_at="$(jq -r '.updated_at' <<<"$target")"
+          state="$(jq -r '.state' <<<"$target")"
+          comments="$(jq -r '.comments' <<<"$target")"
+          assignees="$(jq -r '[.assignees[].login] | sort | join(",")' <<<"$target")"
+          signature="$(printf '%s|%s|%s|%s' "$updated_at" "$state" "$comments" "$assignees" | sha256sum | awk '{print $1}')"
+
+          watch_body="$(gh api "repos/${GITHUB_REPOSITORY}/issues/${WATCH_ISSUE}" --jq '.body')"
+          previous="$(grep -oE '<!-- watch-state:(bootstrap|[0-9a-f]+) -->' <<<"$watch_body" | tail -1 | sed -E 's/<!-- watch-state:([^ ]+) -->/\1/' || true)"
+          [[ -n "$previous" ]] || previous="bootstrap"
+
+          new_body="$(sed -E "s/<!-- watch-state:(bootstrap|[0-9a-f]+) -->/<!-- watch-state:${signature} -->/" <<<"$watch_body")"
+
+          if [[ "$previous" == "bootstrap" ]]; then
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/${WATCH_ISSUE}" -f body="$new_body" >/dev/null
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${WATCH_ISSUE}/comments" -f body="@${USER_LOGIN} watcher ACTIVE. Expensify/App #${TARGET_ISSUE} baseline saved. Future changes will be reported here." >/dev/null
+            exit 0
+          fi
+
+          if [[ "$signature" == "$previous" ]]; then
+            echo "No change"
+            exit 0
+          fi
+
+          page=$(( (comments + 99) / 100 ))
+          (( page > 0 )) || page=1
+          latest="$(gh api "repos/${TARGET_REPO}/issues/${TARGET_ISSUE}/comments?per_page=100&page=${page}")"
+          author="$(jq -r 'if length == 0 then "none" else .[-1].user.login end' <<<"$latest")"
+          url="$(jq -r 'if length == 0 then "https://github.com/Expensify/App/issues/99041" else .[-1].html_url end' <<<"$latest")"
+          summary="$(jq -r 'if length == 0 then "no comment" else .[-1].body end' <<<"$latest" | tr '\n' ' ' | cut -c1-350)"
+
+          gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/${WATCH_ISSUE}" -f body="$new_body" >/dev/null
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${WATCH_ISSUE}/comments" -f body="@${USER_LOGIN} **#99041 changed** — state=${state}, assignees=${assignees:-none}, comments=${comments}, latest=@${author}. ${summary} ${url}" >/dev/null
