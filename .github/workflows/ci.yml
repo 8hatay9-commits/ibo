@@ -1,0 +1,30 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - proof/paid-signal-mvp
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      ACCESS_TOKEN_SECRET: test-secret-that-is-long-enough-for-ci
+      PREMIUM_API_KEY: test-master-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Syntax check
+        run: |
+          node --check api/_auth.mjs
+          node --check api/_payment.mjs
+          node --check api/_lib.mjs
+          node --check api/bounties.mjs
+          node --check api/config.mjs
+          node --check api/quote.mjs
+          node --check api/verify-payment.mjs
+      - name: Unit tests
+        run: node --test test/*.test.mjs
