@@ -42,7 +42,7 @@
   <p class="sub">Scans open GitHub bounty issues, then penalizes stale work, crowded threads, archived repositories and suspicious claim requirements such as requests to expose an agent's hidden instructions.</p>
 
   <div class="toolbar">
-    <input id="key" type="password" placeholder="Premium API key (optional)" autocomplete="off" />
+    <input id="key" type="password" placeholder="Premium access token (optional)" autocomplete="off" />
     <button id="scan" class="primary">Scan live bounties</button>
   </div>
   <div class="meta" id="meta"><span class="badge">Ready</span></div>
@@ -50,10 +50,10 @@
 
   <section class="premium">
     <div>
-      <h2 id="premiumTitle">Premium feed</h2>
-      <p>Unlock up to 25 ranked candidates and the full risk metadata. A payment link can be attached without changing the app code.</p>
+      <h2 id="premiumTitle">Premium feed — $19 / 30 days</h2>
+      <p>Unlock up to 25 ranked candidates and full risk metadata. Pay 19 USDT or 0.008 ETH on Ethereum Mainnet; the checkout verifies the transaction on-chain and activates access automatically.</p>
     </div>
-    <a id="checkout" class="cta" href="#" hidden>Get premium</a>
+    <a id="checkout" class="cta" href="/pay.html">Pay with crypto</a>
   </section>
   <p><small>Ranking is a triage signal, not a guarantee of payment. Always verify bounty rules before starting work.</small></p>
 </main>
@@ -64,8 +64,7 @@
   async function loadConfig(){
     try {
       const c = await fetch('/api/config').then(r => r.json())
-      $('premiumTitle').textContent = `Premium feed — $${c.premiumPriceUsd}/mo`
-      if(c.checkoutUrl){ $('checkout').href = c.checkoutUrl; $('checkout').hidden = false }
+      $('premiumTitle').textContent = `Premium feed — $${c.premiumPriceUsd} / 30 days`
     } catch {}
   }
 
