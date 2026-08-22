@@ -1,3 +1,5 @@
+import { verifyToken } from "./_auth.mjs"
+
 const CACHE_TTL_MS = 90_000
 let cache = { at: 0, rows: [] }
 
@@ -131,8 +133,15 @@ export async function scanBounties() {
 }
 
 export function isPremium(req) {
-  const expected = process.env.PREMIUM_API_KEY
-  if (!expected) return false
   const presented = req.headers["x-api-key"]
-  return typeof presented === "string" && presented === expected
+  if (typeof presented !== "string" || !presented) return false
+
+  const master = process.env.PREMIUM_API_KEY
+  if (master && presented === master) return true
+
+  try {
+    return Boolean(verifyToken(presented, "access"))
+  } catch {
+    return false
+  }
 }
