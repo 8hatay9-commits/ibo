@@ -50,10 +50,10 @@
 
   <section class="premium">
     <div>
-      <h2 id="premiumTitle">Premium feed — $19 / 30 days</h2>
-      <p>Unlock up to 25 ranked candidates and full risk metadata. Pay 19 USDT or 0.008 ETH on Ethereum Mainnet; the checkout verifies the transaction on-chain and activates access automatically.</p>
+      <h2 id="premiumTitle">Premium feed — up to 0.008 ETH / 30 days</h2>
+      <p>Unlock up to 25 ranked candidates and full risk metadata. Checkout uses a quote-specific exact ETH amount slightly below the 0.008 ETH base price on Ethereum Mainnet, then verifies the mined payment on-chain.</p>
     </div>
-    <a id="checkout" class="cta" href="/pay.html">Pay with crypto</a>
+    <a id="checkout" class="cta" href="/pay.html">Pay with ETH</a>
   </section>
   <p><small>Ranking is a triage signal, not a guarantee of payment. Always verify bounty rules before starting work.</small></p>
 </main>
@@ -64,7 +64,8 @@
   async function loadConfig(){
     try {
       const c = await fetch('/api/config').then(r => r.json())
-      $('premiumTitle').textContent = `Premium feed — $${c.premiumPriceUsd} / 30 days`
+      const base = c?.payment?.eth?.baseAmount || '0.008'
+      $('premiumTitle').textContent = `Premium feed — up to ${base} ETH / 30 days`
     } catch {}
   }
 
