@@ -1,12 +1,10 @@
+import crypto from "node:crypto"
 import { signToken } from "./_auth.mjs"
-import {
-  PAYMENT_WALLET,
-  PRICE_ETH,
-  PRICE_ETH_WEI,
-  PRICE_USDT,
-  PRICE_USDT_UNITS,
-  USDT_CONTRACT,
-} from "./_payment.mjs"
+import { PAYMENT_WALLET, PRICE_ETH, PRICE_ETH_WEI, formatEthWei } from "./_payment.mjs"
+
+const QUOTE_TTL_SECONDS = 30 * 60
+const ANTI_REPLAY_STEP_WEI = 1_000_000n
+const ANTI_REPLAY_STEPS = 281_474_976
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -22,13 +20,17 @@ export default async function handler(req, res) {
     return res.end(JSON.stringify({ error: "invalid_claim_hash" }))
   }
 
-  const exp = Math.floor(Date.now() / 1000) + 30 * 60
+  const offsetWei = BigInt(crypto.randomInt(0, ANTI_REPLAY_STEPS)) * ANTI_REPLAY_STEP_WEI
+  const priceEthWei = PRICE_ETH_WEI - offsetWei
+  const iat = Math.floor(Date.now() / 1000)
+  const exp = iat + QUOTE_TTL_SECONDS
+
   const quoteToken = signToken({
     type: "quote",
     claimHash,
+    priceEthWei: priceEthWei.toString(),
+    iat,
     exp,
-    priceUsdtUnits: PRICE_USDT_UNITS.toString(),
-    priceEthWei: PRICE_ETH_WEI.toString(),
   })
 
   res.setHeader("Content-Type", "application/json; charset=utf-8")
@@ -37,8 +39,12 @@ export default async function handler(req, res) {
     network: "Ethereum Mainnet",
     chainId: 1,
     wallet: PAYMENT_WALLET,
-    usdt: { symbol: "USDT", amount: PRICE_USDT, contract: USDT_CONTRACT },
-    eth: { symbol: "ETH", amount: PRICE_ETH },
+    eth: {
+      symbol: "ETH",
+      baseAmount: PRICE_ETH,
+      amount: formatEthWei(priceEthWei),
+      amountWei: priceEthWei.toString(),
+    },
     quoteToken,
     expiresAt: new Date(exp * 1000).toISOString(),
   }))

@@ -23,13 +23,21 @@ export default async function handler(req, res) {
       res.statusCode = 403
       return res.end(JSON.stringify({ ok: false, error: "claim_code_mismatch" }))
     }
+    if (!/^\d+$/.test(String(quote.priceEthWei || ""))) {
+      res.statusCode = 400
+      return res.end(JSON.stringify({ ok: false, error: "invalid_quote_amount" }))
+    }
 
-    const payment = await verifyEthereumPayment(txHash)
-    const exp = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60
+    const payment = await verifyEthereumPayment(txHash, quote.priceEthWei)
+    const issuedAt = Number(quote.iat)
+    if (!Number.isFinite(issuedAt)) throw new Error("Quote issue time is invalid")
+
+    const exp = issuedAt + 30 * 24 * 60 * 60
     const accessToken = signToken({
       type: "access",
       txHash: txHash.toLowerCase(),
       asset: payment.asset,
+      quoteClaimHash: quote.claimHash,
       exp,
     })
 

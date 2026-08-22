@@ -1,12 +1,6 @@
 export const PAYMENT_WALLET = "0xDb12efE909Dc98e974e585A94c90DAa7c1c3D467"
-export const USDT_CONTRACT = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
-export const PRICE_USDT_UNITS = 19_000_000n
-export const PRICE_USDT = "19"
 export const PRICE_ETH_WEI = 8_000_000_000_000_000n
 export const PRICE_ETH = "0.008"
-
-const TRANSFER_TOPIC =
-  "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 
 function rpcUrl() {
   return process.env.ETH_RPC_URL || "https://cloudflare-eth.com"
@@ -24,14 +18,27 @@ async function rpc(method, params) {
   return data.result
 }
 
-function topicAddress(topic = "") {
-  if (!/^0x[0-9a-fA-F]{64}$/.test(topic)) return ""
-  return `0x${topic.slice(-40)}`.toLowerCase()
+export function formatEthWei(value) {
+  const wei = BigInt(value)
+  const base = 1_000_000_000_000_000_000n
+  const whole = wei / base
+  const fraction = (wei % base).toString().padStart(18, "0").replace(/0+$/, "")
+  return fraction ? `${whole}.${fraction}` : whole.toString()
 }
 
-export async function verifyEthereumPayment(txHash) {
+export async function verifyEthereumPayment(txHash, expectedEthWei) {
   if (!/^0x[0-9a-fA-F]{64}$/.test(txHash || "")) {
     throw new Error("Invalid transaction hash")
+  }
+
+  let expected
+  try {
+    expected = BigInt(expectedEthWei)
+  } catch {
+    throw new Error("Invalid quoted ETH amount")
+  }
+  if (expected <= 0n || expected > PRICE_ETH_WEI) {
+    throw new Error("Invalid quoted ETH amount")
   }
 
   const [tx, receipt, latestHex] = await Promise.all([
@@ -49,28 +56,20 @@ export async function verifyEthereumPayment(txHash) {
   if (confirmations < 1) throw new Error("Transaction has no confirmation")
 
   const wallet = PAYMENT_WALLET.toLowerCase()
-  if ((tx.to || "").toLowerCase() === wallet && BigInt(tx.value || "0x0") >= PRICE_ETH_WEI) {
-    return {
-      asset: "ETH",
-      amount: PRICE_ETH,
-      confirmations,
-      from: (tx.from || "").toLowerCase(),
-    }
+  if ((tx.to || "").toLowerCase() !== wallet) {
+    throw new Error("Payment recipient does not match checkout wallet")
   }
 
-  for (const log of receipt.logs || []) {
-    if ((log.address || "").toLowerCase() !== USDT_CONTRACT.toLowerCase()) continue
-    if ((log.topics?.[0] || "").toLowerCase() !== TRANSFER_TOPIC) continue
-    if (topicAddress(log.topics?.[2]) !== wallet) continue
-    if (BigInt(log.data || "0x0") < PRICE_USDT_UNITS) continue
-
-    return {
-      asset: "USDT",
-      amount: PRICE_USDT,
-      confirmations,
-      from: topicAddress(log.topics?.[1]),
-    }
+  const paidWei = BigInt(tx.value || "0x0")
+  if (paidWei !== expected) {
+    throw new Error("Payment amount does not match this quote")
   }
 
-  throw new Error("No qualifying ETH or Ethereum USDT payment to the configured wallet was found")
+  return {
+    asset: "ETH",
+    amount: formatEthWei(expected),
+    amountWei: expected.toString(),
+    confirmations,
+    from: (tx.from || "").toLowerCase(),
+  }
 }

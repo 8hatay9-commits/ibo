@@ -5,40 +5,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Bounty Radar — Crypto Checkout</title>
   <style>
-    :root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,sans-serif;background:#09090b;color:#fafafa}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#18181b 0,#09090b 48%);min-height:100vh}main{width:min(760px,92vw);margin:0 auto;padding:56px 0 80px}a{color:inherit}h1{font-size:clamp(38px,8vw,64px);line-height:1;margin:10px 0 16px;letter-spacing:-.045em}.sub{color:#a1a1aa;line-height:1.6}.warn{margin:22px 0;padding:14px 16px;border:1px solid #854d0e;background:#2b1d08;border-radius:14px;color:#fde68a}.box{margin-top:16px;padding:20px;border:1px solid #303036;border-radius:18px;background:#111114}.label{color:#a1a1aa;font-size:12px;text-transform:uppercase;letter-spacing:.12em}.address{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all;margin:8px 0 14px;font-size:15px}.options{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}.option{padding:18px;border:1px solid #303036;border-radius:14px}.amount{font-size:29px;font-weight:800;margin:4px 0}.muted{color:#a1a1aa;font-size:13px;line-height:1.45}button,.btn,input{border:1px solid #3f3f46;border-radius:12px;padding:12px 14px;background:#18181b;color:#fff;font:inherit}.btn,button{cursor:pointer;font-weight:750;text-decoration:none;display:inline-block}.primary{background:#fafafa;color:#111;border-color:#fafafa}input{width:100%;margin:10px 0}.row{display:flex;gap:10px;flex-wrap:wrap}.status{margin-top:14px;padding:13px;border-radius:12px;background:#18181b;color:#d4d4d8;white-space:pre-wrap}.success{border:1px solid #166534;background:#052e16;color:#bbf7d0}@media(max-width:640px){.options{grid-template-columns:1fr}}
+    :root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,sans-serif;background:#09090b;color:#fafafa}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#18181b 0,#09090b 48%);min-height:100vh}main{width:min(760px,92vw);margin:0 auto;padding:56px 0 80px}a{color:inherit}h1{font-size:clamp(38px,8vw,64px);line-height:1;margin:10px 0 16px;letter-spacing:-.045em}.sub{color:#a1a1aa;line-height:1.6}.warn{margin:22px 0;padding:14px 16px;border:1px solid #854d0e;background:#2b1d08;border-radius:14px;color:#fde68a}.box{margin-top:16px;padding:20px;border:1px solid #303036;border-radius:18px;background:#111114}.label{color:#a1a1aa;font-size:12px;text-transform:uppercase;letter-spacing:.12em}.address{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;word-break:break-all;margin:8px 0 14px;font-size:15px}.amount{font-size:29px;font-weight:800;margin:8px 0}.muted{color:#a1a1aa;font-size:13px;line-height:1.5}button,.btn,input{border:1px solid #3f3f46;border-radius:12px;padding:12px 14px;background:#18181b;color:#fff;font:inherit}.btn,button{cursor:pointer;font-weight:750;text-decoration:none;display:inline-block}.primary{background:#fafafa;color:#111;border-color:#fafafa}input{width:100%;margin:10px 0}.row{display:flex;gap:10px;flex-wrap:wrap}.status{margin-top:14px;padding:13px;border-radius:12px;background:#18181b;color:#d4d4d8;white-space:pre-wrap}.success{border:1px solid #166534;background:#052e16;color:#bbf7d0}.disabled{opacity:.45;pointer-events:none}
   </style>
 </head>
 <body>
 <main>
   <a href="/">← Bounty Radar</a>
   <h1>Unlock Premium</h1>
-  <p class="sub">Pay directly on Ethereum. After the transaction is mined, paste the transaction hash below. The server verifies the payment on-chain and issues a 30-day premium access token.</p>
-  <div class="warn"><strong>Ethereum Mainnet only.</strong> Do not send TRC20, BSC, Solana or another network to this checkout. The recipient below is the configured Trust Wallet Ethereum address.</div>
+  <p class="sub">Pay the exact quoted ETH amount on Ethereum Mainnet. After the transaction is mined, paste its hash to activate 30 days of premium access.</p>
+  <div class="warn"><strong>Ethereum Mainnet only.</strong> Each quote has a unique exact ETH amount and expires after 30 minutes. Sending a rounded or different amount will not activate access.</div>
 
   <section class="box">
     <div class="label">Recipient</div>
     <div id="wallet" class="address">Loading…</div>
     <div class="row"><button id="copyWallet">Copy address</button><a id="explorer" class="btn" target="_blank" rel="noreferrer">View on Etherscan</a></div>
 
-    <div class="options">
-      <div class="option">
-        <div class="label">Option 1</div>
-        <div id="usdtAmount" class="amount">19 USDT</div>
-        <div class="muted">USD₮ ERC-20 on Ethereum Mainnet. The checkout verifies the official Ethereum USDT contract.</div>
-        <p><a id="payUsdt" class="btn primary">Open wallet for USDT</a></p>
-      </div>
-      <div class="option">
-        <div class="label">Option 2</div>
-        <div id="ethAmount" class="amount">0.008 ETH</div>
-        <div class="muted">Native ETH on Ethereum Mainnet. Network gas is paid by the buyer.</div>
-        <p><a id="payEth" class="btn primary">Open wallet for ETH</a></p>
-      </div>
-    </div>
+    <div class="label" style="margin-top:22px">Exact amount for this quote</div>
+    <div id="ethAmount" class="amount">Preparing…</div>
+    <p class="muted">Base price is 0.008 ETH. The quote applies a tiny random anti-replay discount so a public transaction hash cannot be reused with a newly generated quote.</p>
+    <p><a id="payEth" class="btn primary disabled">Open wallet for exact ETH payment</a></p>
+    <div id="quoteStatus" class="muted"></div>
   </section>
 
   <section class="box">
     <div class="label">Activate after payment</div>
-    <p class="muted">Paste the Ethereum transaction hash. A mined qualifying payment to the configured recipient unlocks premium.</p>
+    <p class="muted">Paste the transaction hash for the exact payment above.</p>
     <input id="tx" placeholder="0x… transaction hash" autocomplete="off" />
     <button id="verify" class="primary">Verify payment</button>
     <div id="status" class="status">Preparing secure payment quote…</div>
@@ -58,20 +49,21 @@ async function prepare(){
   config=await fetch('/api/config').then(r=>r.json())
   const p=config.payment
   $('wallet').textContent=p.wallet
-  $('usdtAmount').textContent=`${p.usdt.amount} USDT`
-  $('ethAmount').textContent=`${p.eth.amount} ETH`
   $('explorer').href=`https://etherscan.io/address/${p.wallet}`
-  $('payEth').href=`ethereum:${p.wallet}?value=8000000000000000`
-  $('payUsdt').href=`ethereum:${p.usdt.contract}/transfer?address=${p.wallet}&uint256=19000000`
 
   claimCode=localStorage.getItem('bountyRadarClaimCode')||newClaim()
   localStorage.setItem('bountyRadarClaimCode',claimCode)
   const claimHash=await sha256Hex(claimCode)
   const q=await fetch('/api/quote',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({claimHash})}).then(r=>r.json())
   if(!q.ok) throw new Error(q.error||'quote_failed')
+
   quoteToken=q.quoteToken
   localStorage.setItem('bountyRadarQuoteToken',quoteToken)
-  $('status').textContent=`Ready. Quote expires ${new Date(q.expiresAt).toLocaleTimeString()}. Pay on Ethereum Mainnet, then paste the tx hash.`
+  $('ethAmount').textContent=`${q.eth.amount} ETH`
+  $('payEth').href=`ethereum:${q.wallet}?value=${q.eth.amountWei}`
+  $('payEth').classList.remove('disabled')
+  $('quoteStatus').textContent=`Quote expires ${new Date(q.expiresAt).toLocaleTimeString()}. Pay exactly ${q.eth.amount} ETH.`
+  $('status').textContent='Ready. Pay the exact quoted amount, wait for the transaction to be mined, then paste the tx hash.'
 }
 
 $('copyWallet').addEventListener('click',async()=>{await navigator.clipboard.writeText(config.payment.wallet);$('copyWallet').textContent='Copied';setTimeout(()=>$('copyWallet').textContent='Copy address',1200)})
@@ -92,7 +84,7 @@ $('verify').addEventListener('click',async()=>{
   finally{$('verify').disabled=false}
 })
 
-prepare().catch(e=>$('status').textContent=`Checkout error: ${e.message||e}`)
+prepare().catch(e=>{$('ethAmount').textContent='Unavailable';$('status').textContent=`Checkout error: ${e.message||e}`})
 </script>
 </body>
 </html>
