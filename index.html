@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bounty Radar — find cleaner GitHub bounties</title>
+  <meta name="description" content="Ranks GitHub bounties by payout, competition, freshness and claim-risk signals." />
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background:#09090b; color:#fafafa; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:radial-gradient(circle at top,#18181b 0,#09090b 45%); min-height:100vh; }
+    main { width:min(1050px,92vw); margin:0 auto; padding:64px 0 90px; }
+    .eyebrow { color:#a1a1aa; text-transform:uppercase; letter-spacing:.15em; font-size:12px; }
+    h1 { font-size:clamp(42px,8vw,78px); line-height:.95; margin:12px 0 18px; letter-spacing:-.055em; }
+    .sub { max-width:720px; color:#b4b4bb; font-size:18px; line-height:1.6; }
+    .toolbar { margin:34px 0 22px; display:flex; gap:10px; flex-wrap:wrap; }
+    input,button,a.cta { border:1px solid #303036; border-radius:12px; background:#141417; color:#fff; padding:12px 14px; font:inherit; }
+    input { min-width:280px; flex:1; }
+    button,a.cta { cursor:pointer; font-weight:700; text-decoration:none; }
+    button.primary,a.cta { background:#fafafa; color:#111; border-color:#fafafa; }
+    .meta { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px; color:#a1a1aa; font-size:14px; }
+    .badge { border:1px solid #303036; border-radius:999px; padding:6px 10px; }
+    .grid { display:grid; gap:12px; }
+    .card { display:grid; grid-template-columns:1fr auto; gap:18px; padding:18px; border:1px solid #27272a; background:rgba(20,20,23,.8); border-radius:16px; }
+    .card h3 { margin:0 0 8px; font-size:18px; }
+    .repo { color:#a1a1aa; font-size:13px; margin-bottom:9px; }
+    .facts { color:#d4d4d8; font-size:14px; display:flex; gap:12px; flex-wrap:wrap; }
+    .money { font-size:26px; font-weight:800; letter-spacing:-.03em; text-align:right; }
+    .score { color:#a1a1aa; font-size:13px; text-align:right; margin-top:6px; }
+    .empty { padding:26px; border:1px dashed #3f3f46; border-radius:16px; color:#a1a1aa; }
+    .premium { margin-top:34px; padding:22px; border:1px solid #3f3f46; border-radius:18px; background:#111114; display:flex; justify-content:space-between; gap:20px; align-items:center; flex-wrap:wrap; }
+    .premium h2 { margin:0 0 7px; font-size:22px; }
+    .premium p { margin:0; color:#a1a1aa; max-width:630px; }
+    small { color:#71717a; }
+    @media(max-width:620px){ .card{grid-template-columns:1fr}.money,.score{text-align:left} main{padding-top:42px} }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">Signal over noise</div>
+  <h1>Bounty Radar</h1>
+  <p class="sub">Scans open GitHub bounty issues, then penalizes stale work, crowded threads, archived repositories and suspicious claim requirements such as requests to expose an agent's hidden instructions.</p>
+
+  <div class="toolbar">
+    <input id="key" type="password" placeholder="Premium API key (optional)" autocomplete="off" />
+    <button id="scan" class="primary">Scan live bounties</button>
+  </div>
+  <div class="meta" id="meta"><span class="badge">Ready</span></div>
+  <section class="grid" id="results"><div class="empty">Press “Scan live bounties”. Free tier returns the top 3 clean candidates.</div></section>
+
+  <section class="premium">
+    <div>
+      <h2 id="premiumTitle">Premium feed</h2>
+      <p>Unlock up to 25 ranked candidates and the full risk metadata. A payment link can be attached without changing the app code.</p>
+    </div>
+    <a id="checkout" class="cta" href="#" hidden>Get premium</a>
+  </section>
+  <p><small>Ranking is a triage signal, not a guarantee of payment. Always verify bounty rules before starting work.</small></p>
+</main>
+<script>
+  const $ = (id) => document.getElementById(id)
+  const esc = (s) => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
+
+  async function loadConfig(){
+    try {
+      const c = await fetch('/api/config').then(r => r.json())
+      $('premiumTitle').textContent = `Premium feed — $${c.premiumPriceUsd}/mo`
+      if(c.checkoutUrl){ $('checkout').href = c.checkoutUrl; $('checkout').hidden = false }
+    } catch {}
+  }
+
+  async function scan(){
+    $('scan').disabled = true
+    $('scan').textContent = 'Scanning…'
+    $('results').innerHTML = '<div class="empty">Checking live GitHub issues and repository state…</div>'
+    const key = $('key').value.trim()
+    if(key) localStorage.setItem('bountyRadarKey', key)
+    try {
+      const r = await fetch('/api/bounties', { headers: key ? {'x-api-key': key} : {} })
+      const data = await r.json()
+      if(!data.ok) throw new Error(data.message || data.error)
+      $('meta').innerHTML = `<span class="badge">${esc(data.tier)}</span><span class="badge">${data.returned} shown</span><span class="badge">${data.filteredOut} filtered</span>`
+      if(!data.results.length){ $('results').innerHTML = '<div class="empty">No clean candidates in the current scan.</div>'; return }
+      $('results').innerHTML = data.results.map(x => `
+        <article class="card">
+          <div>
+            <div class="repo">${esc(x.repo)}</div>
+            <h3><a href="${esc(x.url)}" target="_blank" rel="noreferrer" style="color:inherit">${esc(x.title)}</a></h3>
+            <div class="facts"><span>${x.comments} comments</span>${x.updatedAt ? `<span>updated ${new Date(x.updatedAt).toLocaleDateString()}</span>` : ''}</div>
+          </div>
+          <div><div class="money">$${Number(x.amountUsd).toLocaleString()}</div><div class="score">score ${x.score}</div></div>
+        </article>`).join('')
+    } catch(e){
+      $('results').innerHTML = `<div class="empty">Scan failed: ${esc(e.message || e)}</div>`
+    } finally {
+      $('scan').disabled = false
+      $('scan').textContent = 'Scan live bounties'
+    }
+  }
+
+  $('key').value = localStorage.getItem('bountyRadarKey') || ''
+  $('scan').addEventListener('click', scan)
+  loadConfig()
+</script>
+</body>
+</html>
