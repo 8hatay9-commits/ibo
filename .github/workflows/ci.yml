@@ -1,0 +1,23 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - proof/paid-signal-mvp
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Syntax check
+        run: |
+          node --check api/_lib.mjs
+          node --check api/bounties.mjs
+          node --check api/config.mjs
+      - name: Unit tests
+        run: node --test test/radar.test.mjs
