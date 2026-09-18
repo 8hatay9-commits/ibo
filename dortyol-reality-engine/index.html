@@ -36,6 +36,7 @@
     <div id="topbar">
       <div class="brand">DÖRTYOL REALITY ENGINE<small>truth-first terrain + real imagery</small></div>
       <div class="top-actions">
+        <button class="btn" id="truthScan">GERÇEKLİK TARA</button>
         <button class="btn" id="surfaceToggle">UYDU</button>
         <button class="btn" data-view="terrain">3B ARAZİ</button>
         <button class="btn" data-view="imagery">GERÇEK FOTO</button>
@@ -48,7 +49,10 @@
       <div class="status-row"><span>Rakım</span><b id="elev">hesaplanıyor…</b></div>
       <div class="status-row"><span>Geometri</span><b>AWS Terrain Tiles / DEM</b></div>
       <div class="status-row"><span>Yüzey</span><b id="surfaceName">Sentinel-2 Cloudless 2025</b></div>
-      <div class="badge">REAL SATELLITE + TERRAIN — yaya ayrıntısı yalnız gerçek yer çekimiyle</div>
+      <div class="status-row"><span>Panoramax</span><b id="pnxCount">tarama yok</b></div>
+      <div class="status-row"><span>KartaView</span><b id="kvCount">tarama yok</b></div>
+      <div class="status-row"><span>Commons referans</span><b id="wcCount">tarama yok</b></div>
+      <div class="badge" id="truthBadge">REAL SATELLITE + TERRAIN — yaya ayrıntısı yalnız gerçek yer çekimiyle</div>
     </div>
     <div id="walkControls">
       <button class="walk forward" aria-label="ileri">▲</button>
@@ -119,6 +123,41 @@ document.querySelector('.backward').onclick=()=>move(-18);
 document.querySelector('.lookL').onclick=()=>map.easeTo({bearing:map.getBearing()-15,duration:120});
 document.querySelector('.lookR').onclick=()=>map.easeTo({bearing:map.getBearing()+15,duration:120});
 let satelliteOn=true;
+async function jsonFetch(url){
+  const ctrl=new AbortController(); const t=setTimeout(()=>ctrl.abort(),9000);
+  try{const r=await fetch(url,{signal:ctrl.signal,headers:{'Accept':'application/json'}});if(!r.ok)throw new Error('HTTP '+r.status);return await r.json();}
+  finally{clearTimeout(t);}
+}
+function kartaCount(data){
+  const d=data?.result?.data ?? data?.result ?? data;
+  if(Array.isArray(d)) return d.length;
+  if(Array.isArray(d?.photos)) return d.photos.length;
+  if(d && typeof d==='object'){
+    for(const k of ['photos','data','items','currentPageItems']) if(Array.isArray(d[k])) return d[k].length;
+  }
+  return 0;
+}
+async function truthScan(){
+  const btn=document.getElementById('truthScan'); btn.textContent='TARANIYOR…'; btn.disabled=true;
+  const pnx=document.getElementById('pnxCount'),kv=document.getElementById('kvCount'),wc=document.getElementById('wcCount'),badge=document.getElementById('truthBadge');
+  pnx.textContent=kv.textContent=wc.textContent='…';
+  const m=map.getCenter(), d=.012;
+  const pnxUrl='https://api.panoramax.xyz/api/search?bbox='+[m.lng-d,m.lat-d,m.lng+d,m.lat+d].join(',')+'&limit=100';
+  const kvUrl='https://api.openstreetcam.org/2.0/photo/?lat='+m.lat+'&lng='+m.lng+'&zoomLevel=15';
+  const wcUrl='https://commons.wikimedia.org/w/api.php?origin=*&action=query&format=json&generator=geosearch&ggsprimary=all&ggsnamespace=6&ggsradius=3000&ggscoord='+m.lat+'%7C'+m.lng+'&ggslimit=100&prop=coordinates%7Cimageinfo&iiprop=url%7Cextmetadata';
+  const res=await Promise.allSettled([jsonFetch(pnxUrl),jsonFetch(kvUrl),jsonFetch(wcUrl)]);
+  let pc=0,kc=0,wcN=0;
+  if(res[0].status==='fulfilled') pc=Array.isArray(res[0].value?.features)?res[0].value.features.length:0; else pnx.textContent='API hata';
+  if(res[1].status==='fulfilled') kc=kartaCount(res[1].value); else kv.textContent='API hata';
+  if(res[2].status==='fulfilled') wcN=Object.keys(res[2].value?.query?.pages||{}).length; else wc.textContent='API hata';
+  if(pnx.textContent!=='API hata') pnx.textContent=pc+' gerçek kare';
+  if(kv.textContent!=='API hata') kv.textContent=kc+' gerçek kare';
+  if(wc.textContent!=='API hata') wc.textContent=wcN+' referans';
+  if(pc+kc>0){badge.textContent='VERIFIED GROUND CANDIDATE — gerçek yer görüntüsü bulundu; lisans + geo QA sonrası yürüyüşe alınabilir';badge.style.color='#77d98b';badge.style.borderColor='#315c39';}
+  else {badge.textContent='GROUND GAP — açık yer görüntüsü bulunamadı; uydu/DEM gerçek ama yaya ayrıntısı UNKNOWN';badge.style.color='#ffd166';badge.style.borderColor='#5e5131';}
+  btn.textContent='GERÇEKLİK TARA';btn.disabled=false;
+}
+document.getElementById('truthScan').onclick=truthScan;
 document.getElementById('surfaceToggle').onclick=()=>{
   satelliteOn=!satelliteOn;
   map.setPaintProperty('satellite','raster-opacity',satelliteOn?1:0);
