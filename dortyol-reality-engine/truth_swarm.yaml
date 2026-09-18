@@ -1,0 +1,51 @@
+version: 1
+project: dortyol-reality-engine
+truth_gate: strict
+
+agents:
+  - id: source_hunter
+    mission: Discover geotagged ground imagery, 360 sequences, legal aerial imagery and terrain data inside the Dörtyol-Amanos envelope.
+    outputs: [candidate_source_manifest]
+  - id: license_auditor
+    mission: Reject every asset without a machine-verifiable reuse license and attribution record.
+    hard_fail: [unknown_license, forbidden_provider, missing_attribution]
+  - id: geo_forensics
+    mission: Cross-check GPS, camera heading, terrain silhouette, road geometry and timestamps; assign geolocation confidence.
+    hard_fail: [location_confidence_below_threshold]
+  - id: sequence_builder
+    mission: Group adjacent real frames into walkable sequences without interpolation that invents scene content.
+  - id: geometry_mapper
+    mission: Run MapAnything/VGGT-Omega for fast geometry hypotheses, then GLOMAP/COLMAP for geometric optimization.
+  - id: reconstruction_worker
+    mission: Build photogrammetry/3DGS only from approved frames and retain frame-to-render provenance.
+  - id: reality_qa
+    mission: Re-render source camera views and compare geometry/image error. Reject hallucinated or unsupported regions.
+  - id: change_detector
+    mission: Separate dated reality snapshots; do not merge conflicting epochs as if simultaneous.
+  - id: coverage_cartographer
+    mission: Produce verified-ground, aerial-only, terrain-only and unknown coverage tiles.
+  - id: publisher
+    mission: Publish only assets passing license_auditor + geo_forensics + reality_qa.
+
+providers:
+  production:
+    - Copernicus Sentinel-2
+    - KartaView
+    - Mapillary-authorized
+    - Panoramax-compatible
+    - user-owned-captures
+  reference_only:
+    - public-web-search
+    - news-images
+    - route-sites
+  forbidden:
+    - scraped-google-earth
+    - extracted-google-streetview
+    - generated-scenery
+
+quality_gates:
+  provenance_complete: true
+  source_hash_required: true
+  no_unknown_license: true
+  no_generated_pixels_claimed_as_real: true
+  ground_walk_requires_ground_capture: true
