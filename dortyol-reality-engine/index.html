@@ -36,6 +36,7 @@
     <div id="topbar">
       <div class="brand">DÖRTYOL REALITY ENGINE<small>truth-first terrain + real imagery</small></div>
       <div class="top-actions">
+        <button class="btn" id="surfaceToggle">UYDU</button>
         <button class="btn" data-view="terrain">3B ARAZİ</button>
         <button class="btn" data-view="imagery">GERÇEK FOTO</button>
         <button class="btn" data-view="about">KAYNAK</button>
@@ -46,7 +47,8 @@
       <div class="status-row"><span>Koordinat</span><b id="coord">36.2274, 36.8371</b></div>
       <div class="status-row"><span>Rakım</span><b id="elev">hesaplanıyor…</b></div>
       <div class="status-row"><span>Geometri</span><b>AWS Terrain Tiles / DEM</b></div>
-      <div class="badge">TERRAIN ONLY — yer fotoğrafı doğrulanmadı</div>
+      <div class="status-row"><span>Yüzey</span><b id="surfaceName">Sentinel-2 Cloudless 2025</b></div>
+      <div class="badge">REAL SATELLITE + TERRAIN — yaya ayrıntısı yalnız gerçek yer çekimiyle</div>
     </div>
     <div id="walkControls">
       <button class="walk forward" aria-label="ileri">▲</button>
@@ -67,7 +69,7 @@
   <div id="about" class="view">
     <div id="topbar"><div class="top-actions" style="margin-left:auto"><button class="btn" data-view="terrain">← HARİTA</button></div></div>
     <div class="card panel"><h2>Gerçeklik kuralı</h2><p>Bu sistem görüntü olmayan araziyi fotogerçekçi diye göstermez. Yükseklik geometrisi gerçek DEM'den gelir; yaya/fotoğraf katmanı ise yalnız gerçek çekim sağlayıcısında veri varsa açılır.</p></div>
-    <div class="card panel"><h2>Şu an bağlı kaynaklar</h2><ul><li>OpenStreetMap — yol ve harita bağlamı.</li><li>AWS Open Data Terrain Tiles — gerçek yükseklik modeli.</li><li>Panoramax federated STAC — açık, coğrafi etiketli yer görüntüleri.</li></ul></div>
+    <div class="card panel"><h2>Şu an bağlı kaynaklar</h2><ul><li>EOxCloudless Sentinel-2 2025 — gerçek uydu yüzeyi; prototipte non-commercial lisansla ve attribution ile kullanılır.</li><li>OpenStreetMap — yol ve harita bağlamı.</li><li>AWS Open Data Terrain Tiles — gerçek yükseklik modeli.</li><li>Panoramax federated STAC — açık, coğrafi etiketli yer görüntüleri.</li></ul></div>
     <div class="card panel"><h2>Sıradaki üretim hattı</h2><p>Mapillary yetkili API adaptörü → internet görüntülerini koordinat/tarih/lisans filtresiyle toplama → MapAnything / VGGT-Ω → GLOMAP/COLMAP geometrik optimizasyon → gsplat → 3D Tiles → bu görüntüleyici.</p></div>
   </div>
 </div>
@@ -85,10 +87,12 @@ const map=new maplibregl.Map({
     version:8,
     sources:{
       osm:{type:'raster',tiles:['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],tileSize:256,maxzoom:19,attribution:'© OpenStreetMap contributors'},
+      satellite:{type:'raster',tiles:['https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2025_3857/default/g/{z}/{y}/{x}.jpg'],tileSize:256,maxzoom:14,attribution:'EOxCloudless by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2025)'},
       terrain:{type:'raster-dem',tiles:['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],tileSize:256,maxzoom:15,encoding:'terrarium',attribution:'Terrain Tiles © Mapzen / AWS Open Data'}
     },
     layers:[
-      {id:'osm',type:'raster',source:'osm',paint:{'raster-opacity':0.95}},
+      {id:'satellite',type:'raster',source:'satellite',paint:{'raster-opacity':1}},
+      {id:'osm',type:'raster',source:'osm',paint:{'raster-opacity':0}},
       {id:'hill',type:'hillshade',source:'terrain',paint:{'hillshade-exaggeration':0.35,'hillshade-shadow-color':'#101417','hillshade-highlight-color':'#e6eef2'}}
     ],
     terrain:{source:'terrain',exaggeration:1.0}
@@ -114,6 +118,14 @@ document.querySelector('.forward').onclick=()=>move(22);
 document.querySelector('.backward').onclick=()=>move(-18);
 document.querySelector('.lookL').onclick=()=>map.easeTo({bearing:map.getBearing()-15,duration:120});
 document.querySelector('.lookR').onclick=()=>map.easeTo({bearing:map.getBearing()+15,duration:120});
+let satelliteOn=true;
+document.getElementById('surfaceToggle').onclick=()=>{
+  satelliteOn=!satelliteOn;
+  map.setPaintProperty('satellite','raster-opacity',satelliteOn?1:0);
+  map.setPaintProperty('osm','raster-opacity',satelliteOn?0:1);
+  document.getElementById('surfaceToggle').textContent=satelliteOn?'UYDU':'YOL';
+  document.getElementById('surfaceName').textContent=satelliteOn?'Sentinel-2 Cloudless 2025':'OpenStreetMap';
+};
 document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{
   const id=b.dataset.view;
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
