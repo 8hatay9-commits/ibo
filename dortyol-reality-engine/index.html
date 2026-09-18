@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>Dörtyol Reality Engine</title>
+  <link href="https://unpkg.com/maplibre-gl@6.10.0/dist/maplibre-gl.css" rel="stylesheet" />
+  <script src="https://unpkg.com/maplibre-gl@6.10.0/dist/maplibre-gl.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@panoramax/web-viewer@5.2.0/build/cjs/index.js"></script>
+  <style>
+    :root{color-scheme:dark;--bg:#090b0d;--panel:rgba(10,13,16,.86);--line:#2b333b;--text:#f2f5f7;--muted:#9aa6af;--ok:#77d98b;--warn:#ffd166;--bad:#ff6b6b}
+    *{box-sizing:border-box} html,body{margin:0;width:100%;height:100%;background:var(--bg);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--text);overflow:hidden}
+    #app{position:fixed;inset:0}.view{position:absolute;inset:0;display:none}.view.active{display:block}
+    #terrainMap{position:absolute;inset:0}
+    #topbar{position:absolute;top:env(safe-area-inset-top,0);left:0;right:0;padding:10px;display:flex;gap:8px;z-index:10;pointer-events:none}
+    .brand,.chip,.btn,.panel{backdrop-filter:blur(16px);background:var(--panel);border:1px solid var(--line);box-shadow:0 8px 30px rgba(0,0,0,.28)}
+    .brand{padding:10px 12px;border-radius:14px;font-weight:800;letter-spacing:.2px;pointer-events:auto}.brand small{display:block;font-size:10px;color:var(--muted);font-weight:600;margin-top:2px}
+    .top-actions{margin-left:auto;display:flex;gap:6px;pointer-events:auto}.btn{color:var(--text);border-radius:12px;padding:9px 11px;font-weight:700;font-size:12px}.btn:active{transform:scale(.97)}
+    #status{position:absolute;left:10px;bottom:calc(116px + env(safe-area-inset-bottom,0));z-index:8;max-width:min(92vw,420px);padding:12px 13px;border-radius:16px}
+    .status-title{font-weight:800;font-size:13px}.status-row{display:flex;justify-content:space-between;gap:18px;margin-top:5px;font-size:12px;color:var(--muted)}.status-row b{color:var(--text);font-weight:700}
+    .badge{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;margin-top:8px;padding:5px 8px;border-radius:999px;border:1px solid #5e5131;background:rgba(90,70,12,.32);color:var(--warn)}
+    #walkControls{position:absolute;z-index:9;right:10px;bottom:calc(18px + env(safe-area-inset-bottom,0));display:grid;grid-template-columns:54px 54px 54px;grid-template-rows:50px 50px;gap:6px}
+    .walk{background:rgba(8,12,15,.86);border:1px solid #33404a;color:#fff;border-radius:14px;font-size:21px;font-weight:800;backdrop-filter:blur(12px)}.walk:active{background:#26323a}
+    #back{grid-column:2}.lookL{grid-column:1;grid-row:2}.forward{grid-column:2;grid-row:1}.lookR{grid-column:3;grid-row:2}.backward{grid-column:2;grid-row:2}
+    #centerDot{position:absolute;left:50%;top:50%;width:9px;height:9px;border-radius:50%;border:2px solid white;box-shadow:0 0 0 2px rgba(0,0,0,.55);transform:translate(-50%,-50%);z-index:6;pointer-events:none}
+    #imagery{background:#090b0d;padding-top:64px} pnx-viewer{display:block;width:100%;height:calc(100% - 64px)}
+    .imagery-note{position:absolute;top:8px;left:10px;right:10px;z-index:20;padding:10px 12px;border-radius:14px;font-size:12px;color:var(--muted)} .imagery-note b{color:var(--text)}
+    #about{overflow:auto;padding:76px 16px 32px;background:#0a0d10}.card{max-width:760px;margin:0 auto 12px;padding:16px;border-radius:16px}.card h2{margin:0 0 8px;font-size:18px}.card p,.card li{color:#b8c2ca;line-height:1.5;font-size:14px}
+    @media(min-width:800px){#walkControls{right:22px;bottom:22px}#status{left:22px;bottom:22px}.brand{margin-left:10px}}
+  </style>
+</head>
+<body>
+<div id="app">
+  <div id="terrain" class="view active">
+    <div id="terrainMap"></div><div id="centerDot"></div>
+    <div id="topbar">
+      <div class="brand">DÖRTYOL REALITY ENGINE<small>truth-first terrain + real imagery</small></div>
+      <div class="top-actions">
+        <button class="btn" data-view="terrain">3B ARAZİ</button>
+        <button class="btn" data-view="imagery">GERÇEK FOTO</button>
+        <button class="btn" data-view="about">KAYNAK</button>
+      </div>
+    </div>
+    <div id="status" class="panel">
+      <div class="status-title">Dörtyol / Batı Amanos</div>
+      <div class="status-row"><span>Koordinat</span><b id="coord">36.2274, 36.8371</b></div>
+      <div class="status-row"><span>Rakım</span><b id="elev">hesaplanıyor…</b></div>
+      <div class="status-row"><span>Geometri</span><b>AWS Terrain Tiles / DEM</b></div>
+      <div class="badge">TERRAIN ONLY — yer fotoğrafı doğrulanmadı</div>
+    </div>
+    <div id="walkControls">
+      <button class="walk forward" aria-label="ileri">▲</button>
+      <button class="walk lookL" aria-label="sola bak">↶</button>
+      <button class="walk backward" aria-label="geri">▼</button>
+      <button class="walk lookR" aria-label="sağa bak">↷</button>
+    </div>
+  </div>
+
+  <div id="imagery" class="view">
+    <div class="imagery-note panel"><b>GERÇEK YER GÖRÜNTÜSÜ:</b> Bu sekme Panoramax'ın açık STAC görüntülerini gösterir. Dörtyol'da görüntü yoksa sistem görüntü uydurmaz.</div>
+    <pnx-viewer endpoint="https://api.panoramax.xyz/api"></pnx-viewer>
+    <div id="topbar">
+      <div class="top-actions" style="margin-left:auto"><button class="btn" data-view="terrain">← 3B ARAZİ</button><button class="btn" data-view="about">KAYNAK</button></div>
+    </div>
+  </div>
+
+  <div id="about" class="view">
+    <div id="topbar"><div class="top-actions" style="margin-left:auto"><button class="btn" data-view="terrain">← HARİTA</button></div></div>
+    <div class="card panel"><h2>Gerçeklik kuralı</h2><p>Bu sistem görüntü olmayan araziyi fotogerçekçi diye göstermez. Yükseklik geometrisi gerçek DEM'den gelir; yaya/fotoğraf katmanı ise yalnız gerçek çekim sağlayıcısında veri varsa açılır.</p></div>
+    <div class="card panel"><h2>Şu an bağlı kaynaklar</h2><ul><li>OpenStreetMap — yol ve harita bağlamı.</li><li>AWS Open Data Terrain Tiles — gerçek yükseklik modeli.</li><li>Panoramax federated STAC — açık, coğrafi etiketli yer görüntüleri.</li></ul></div>
+    <div class="card panel"><h2>Sıradaki üretim hattı</h2><p>Mapillary yetkili API adaptörü → internet görüntülerini koordinat/tarih/lisans filtresiyle toplama → MapAnything / VGGT-Ω → GLOMAP/COLMAP geometrik optimizasyon → gsplat → 3D Tiles → bu görüntüleyici.</p></div>
+  </div>
+</div>
+<script>
+const DORTYOL=[36.2274002,36.8371017];
+const map=new maplibregl.Map({
+  container:'terrainMap',
+  center:DORTYOL,
+  zoom:12.4,
+  pitch:74,
+  bearing:76,
+  maxPitch:85,
+  hash:true,
+  style:{
+    version:8,
+    sources:{
+      osm:{type:'raster',tiles:['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],tileSize:256,maxzoom:19,attribution:'© OpenStreetMap contributors'},
+      terrain:{type:'raster-dem',tiles:['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],tileSize:256,maxzoom:15,encoding:'terrarium',attribution:'Terrain Tiles © Mapzen / AWS Open Data'}
+    },
+    layers:[
+      {id:'osm',type:'raster',source:'osm',paint:{'raster-opacity':0.95}},
+      {id:'hill',type:'hillshade',source:'terrain',paint:{'hillshade-exaggeration':0.35,'hillshade-shadow-color':'#101417','hillshade-highlight-color':'#e6eef2'}}
+    ],
+    terrain:{source:'terrain',exaggeration:1.0}
+  }
+});
+map.addControl(new maplibregl.NavigationControl({visualizePitch:true}),'top-left');
+map.on('load',()=>{map.easeTo({center:[36.275,36.86],zoom:12.8,pitch:78,bearing:90,duration:1800});updateStatus();});
+map.on('move',updateStatus);
+function updateStatus(){
+  const c=map.getCenter();
+  document.getElementById('coord').textContent=c.lng.toFixed(5)+', '+c.lat.toFixed(5);
+  let z=null; try{z=map.queryTerrainElevation(c,{exaggerated:false});}catch(e){}
+  document.getElementById('elev').textContent=(z==null||Number.isNaN(z))?'—':Math.round(z)+' m';
+}
+function move(step){
+  const c=map.getCenter(),br=map.getBearing()*Math.PI/180;
+  const north=step*Math.cos(br),east=step*Math.sin(br);
+  const dLat=north/111320;
+  const dLon=east/(111320*Math.cos(c.lat*Math.PI/180));
+  map.easeTo({center:[c.lng+dLon,c.lat+dLat],duration:180});
+}
+document.querySelector('.forward').onclick=()=>move(22);
+document.querySelector('.backward').onclick=()=>move(-18);
+document.querySelector('.lookL').onclick=()=>map.easeTo({bearing:map.getBearing()-15,duration:120});
+document.querySelector('.lookR').onclick=()=>map.easeTo({bearing:map.getBearing()+15,duration:120});
+document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{
+  const id=b.dataset.view;
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if(id==='terrain') setTimeout(()=>map.resize(),50);
+}));
+</script>
+</body>
+</html>
