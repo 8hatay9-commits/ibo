@@ -17,14 +17,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout reality branch
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           ref: dortyol-reality-engine
       - name: Scan public ground-imagery coverage
         run: python3 dortyol-reality-engine/scan_coverage.py
       - name: Persist coverage result
         run: |
-          if git diff --quiet -- dortyol-reality-engine/coverage.json; then
+          if [ -z "$(git status --porcelain -- dortyol-reality-engine/coverage.json)" ]; then
             echo "Coverage unchanged"
             exit 0
           fi
