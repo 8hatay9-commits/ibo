@@ -1,0 +1,65 @@
+{
+  "version": "0.3",
+  "rule": "No visible detail may be presented as ground truth unless it is traceable to a verified source.",
+  "required_provenance": [
+    "source_url",
+    "provider",
+    "capture_time_or_dataset_epoch",
+    "geolocation",
+    "license",
+    "content_hash",
+    "ingest_time"
+  ],
+  "classes": {
+    "GROUND_RECONSTRUCTION": {
+      "allowed": [
+        "user-owned capture",
+        "Mapillary CC-BY-SA imagery via authorized API",
+        "KartaView CC-BY-SA imagery",
+        "Panoramax imagery when instance license permits derivative use"
+      ],
+      "requires": [
+        "camera-level imagery",
+        "reuse-compatible license",
+        "geolocation confidence",
+        "capture date"
+      ],
+      "can_claim_photoreal_walk": true
+    },
+    "AERIAL_ORBITAL": {
+      "allowed": [
+        "Copernicus Sentinel-2 direct/open data",
+        "licensed orthophoto",
+        "licensed drone capture"
+      ],
+      "can_claim_photoreal_walk": false,
+      "note": "Valid for terrain/surface context only; never invent unseen ground detail."
+    },
+    "REFERENCE_ONLY": {
+      "allowed": [
+        "news photos",
+        "government web photos",
+        "Wikiloc/other copyrighted route media",
+        "unlicensed web images"
+      ],
+      "training_or_texture_use": false,
+      "purpose": "QA, visual comparison and gap discovery only."
+    },
+    "FORBIDDEN": {
+      "sources": [
+        "Google Earth scraping",
+        "Google Street View extraction",
+        "unknown-license imagery",
+        "generative scenery"
+      ],
+      "reason": "licensing, provenance or truthfulness failure"
+    }
+  },
+  "commercial": {
+    "copernicus_sentinel": "allowed with required source notice",
+    "kartaview": "CC-BY-SA-4.0; attribution/share-alike obligations apply",
+    "mapillary": "CC-BY-SA imagery plus provider terms; authorized API required",
+    "panoramax": "instance-specific open license; derivative/open-data conditions must be preserved",
+    "eox_cloudless_2018_plus": "prototype/non-commercial endpoint only unless commercial license is obtained"
+  }
+}
