@@ -2,10 +2,8 @@ name: IBO Android APK
 
 on:
   push:
-    branches: [ibo-agent-v1]
-    paths:
-      - '.github/workflows/ibo-apk.yml'
-      - 'ibo-agent/**'
+    branches:
+      - ibo-agent-v1
   workflow_dispatch:
 
 permissions:
@@ -15,128 +13,45 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 25
-
     steps:
-      - name: Checkout IBO
-        uses: actions/checkout@v4
-        with:
-          ref: ibo-agent-v1
+      - name: Fetch Android shell
+        run: git clone --depth 1 --branch dev https://github.com/xchacha20-poly1305/webview-apk-template.git android-shell
 
-      - name: Fetch maintained Android WebView shell
-        run: |
-          git clone --depth 1 --branch dev https://github.com/xchacha20-poly1305/webview-apk-template.git android-shell
-
-      - name: Configure IBO shell
-        working-directory: android-shell
-        run: |
-          cat > ibo-icon.svg <<'SVG'
-          <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-            <defs>
-              <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stop-color="#efffa5"/>
-                <stop offset=".55" stop-color="#b8ff58"/>
-                <stop offset="1" stop-color="#70d944"/>
-              </linearGradient>
-            </defs>
-            <rect width="1024" height="1024" rx="250" fill="#080a0d"/>
-            <rect x="118" y="118" width="788" height="788" rx="218" fill="#11160f" stroke="#b8ff58" stroke-opacity=".22" stroke-width="10"/>
-            <circle cx="512" cy="512" r="260" fill="#b8ff58" fill-opacity=".07"/>
-            <text x="512" y="690" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="500" font-weight="900" fill="url(#g)">İ</text>
-          </svg>
-          SVG
-
-          cat > app.properties <<'EOF'
-          app.url=https://ibo-agent-runtime-8hatay9-9554s-projects.vercel.app/
-          app.package=ai.ibo.agent
-          app.name=İBO
-          app.icon_url=ibo-icon.svg
-          app.icon_fallback=false
-          EOF
-
-      - name: Enable secure auth popups in WebView
-        working-directory: android-shell
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path("app/src/main/java/io/github/webviewtemplate/MainActivity.kt")
-          s=p.read_text(encoding="utf-8")
-          s=s.replace("import android.Manifest\n", "import android.Manifest\nimport android.app.Dialog\n")
-          s=s.replace("import android.os.Bundle\n", "import android.os.Bundle\nimport android.os.Message\n")
-          s=s.replace("import android.provider.MediaStore\n", "import android.provider.MediaStore\nimport android.view.ViewGroup\n")
-          needle="        webView.settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE\n"
-          repl=needle+"        webView.settings.javaScriptCanOpenWindowsAutomatically = true\n        webView.settings.setSupportMultipleWindows(true)\n"
-          if needle not in s:
-              raise SystemExit("settings patch point not found")
-          s=s.replace(needle,repl,1)
-          needle2="            override fun onPermissionRequest(request: PermissionRequest?) {\n"
-          popup=r'''            override fun onCreateWindow(
-                  view: WebView?,
-                  isDialog: Boolean,
-                  isUserGesture: Boolean,
-                  resultMsg: Message?
-              ): Boolean {
-                  if (resultMsg == null) return false
-                  val popup = WebView(this@MainActivity)
-                  popup.settings.javaScriptEnabled = true
-                  popup.settings.domStorageEnabled = true
-                  popup.settings.mediaPlaybackRequiresUserGesture = false
-                  popup.settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
-                  popup.settings.javaScriptCanOpenWindowsAutomatically = true
-                  popup.settings.setSupportMultipleWindows(true)
-                  CookieManager.getInstance().setAcceptCookie(true)
-                  CookieManager.getInstance().setAcceptThirdPartyCookies(popup, true)
-
-                  val dialog = Dialog(this@MainActivity, android.R.style.Theme_DeviceDefault_NoActionBar)
-                  popup.webViewClient = object : WebViewClient() {}
-                  popup.webChromeClient = object : WebChromeClient() {
-                      override fun onCloseWindow(window: WebView?) {
-                          dialog.dismiss()
-                      }
-                  }
-                  dialog.setContentView(
-                      popup,
-                      ViewGroup.LayoutParams(
-                          ViewGroup.LayoutParams.MATCH_PARENT,
-                          ViewGroup.LayoutParams.MATCH_PARENT
-                      )
-                  )
-                  dialog.setOnDismissListener { popup.destroy() }
-                  dialog.show()
-
-                  val transport = resultMsg.obj as WebView.WebViewTransport
-                  transport.webView = popup
-                  resultMsg.sendToTarget()
-                  return true
-              }
-
-'''
-          if needle2 not in s:
-              raise SystemExit("popup patch point not found")
-          s=s.replace(needle2,popup+needle2,1)
-          p.write_text(s,encoding="utf-8")
-          PY
-
-      - name: Set up Java 17
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Install icon tooling
-        run: sudo apt-get update -qq && sudo apt-get install -y imagemagick libxml2-utils >/dev/null
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
 
-      - name: Build installable APK
+      - name: Install SDK packages
+        run: sdkmanager "platforms;android-37" "build-tools;37.0.0"
+
+      - name: Configure IBO
+        working-directory: android-shell
+        run: |
+          cat > app.properties <<'EOF'
+          app.url=https://ibo-agent-runtime-8hatay9-9554s-projects.vercel.app/
+          app.package=ai.ibo.agent
+          app.name=İBO
+          app.icon_url=
+          app.icon_fallback=false
+          EOF
+
+      - name: Build APK
         working-directory: android-shell
         env:
           GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.workers.max=2
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon --max-workers=2 assembleDebug
-          test -f app/build/outputs/apk/debug/app-debug.apk
+          test -s app/build/outputs/apk/debug/app-debug.apk
           unzip -t app/build/outputs/apk/debug/app-debug.apk >/dev/null
-          echo "APK_ZIP_OK"
+          sha256sum app/build/outputs/apk/debug/app-debug.apk
 
-      - name: Upload IBO APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: IBO-APK
