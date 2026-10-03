@@ -1,0 +1,93 @@
+name: IBO AR APK Build
+on:
+  push:
+    branches:
+      - tmp-ibo-ar-apk-build-20261003
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Fetch source immediately
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 'https://sdmntprdenmarkeast.oaiusercontent.com/files/00000000-9d34-8210-845f-0ffae8158f29/raw?se=2026-10-03T02%3A38%3A59Z&sp=r&sv=2026-02-06&sr=b&scid=f6de6439-e028-5185-85b5-8b7694a95504&skoid=d294dba5-36f7-432b-aab8-935656489847&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-10-02T20%3A02%3A09Z&ske=2026-10-03T20%3A02%3A09Z&sks=b&skv=2026-02-06&sig=aijWtI2HHoNhXS3J/AxW1S0%2BFLfH147JWO3AJxTi0Dk%3D' -o source.b64
+          tr -d '\r\n\t ' < source.b64 | base64 -d > source.tar.xz
+          mkdir -p work
+          tar -xJf source.tar.xz -C work
+          test -f work/src/com/ibo/alantarama/app/AreaScreen.java
+          test -f work/src/com/ibo/alantarama/app/AreaArView.java
+      - name: Prepare Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" >/dev/null
+      - name: Prepare package
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd work
+          mkdir -p assets/fonts res/values build/classes build/dex
+          curl -fL --retry 3 'https://raw.githubusercontent.com/google/fonts/main/ofl/archivo/Archivo%5Bwdth%2Cwght%5D.ttf' -o assets/fonts/archivo.ttf
+          cat > res/values/strings.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources><string name="app_name">İBO Alan Tarama</string></resources>
+          EOF
+          cat > AndroidManifest.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.ibo.alantarama">
+            <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="35"/>
+            <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS"/>
+            <uses-permission android:name="android.permission.CAMERA"/>
+            <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+            <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+            <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+            <uses-permission android:name="android.permission.WAKE_LOCK"/>
+            <uses-feature android:name="android.hardware.sensor.compass" android:required="true"/>
+            <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="true"/>
+            <uses-feature android:name="android.hardware.camera" android:required="false"/>
+            <uses-feature android:name="android.hardware.location.gps" android:required="false"/>
+            <uses-feature android:name="android.hardware.microphone" android:required="false"/>
+            <application android:label="@string/app_name" android:theme="@android:style/Theme.DeviceDefault.NoActionBar" android:allowBackup="false" android:hardwareAccelerated="true" android:largeHeap="true">
+              <activity android:name="com.ibo.alantarama.app.MainActivity" android:exported="true" android:screenOrientation="portrait" android:configChanges="orientation|screenSize|keyboardHidden|uiMode" android:windowSoftInputMode="adjustResize">
+                <intent-filter>
+                  <action android:name="android.intent.action.MAIN"/>
+                  <category android:name="android.intent.category.LAUNCHER"/>
+                </intent-filter>
+              </activity>
+            </application>
+          </manifest>
+          EOF
+      - name: Compile Java and dex
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd work
+          ANDROID_JAR="$ANDROID_HOME/platforms/android-35/android.jar"
+          find src -name '*.java' -print > build/sources.txt
+          javac -encoding UTF-8 -source 8 -target 8 -classpath "$ANDROID_JAR" -d build/classes @build/sources.txt
+          jar cf build/classes.jar -C build/classes .
+          "$ANDROID_HOME/build-tools/35.0.0/d8" --min-api 26 --output build/dex build/classes.jar
+      - name: Package sign verify
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd work
+          BT="$ANDROID_HOME/build-tools/35.0.0"
+          "$BT/aapt" package -f -M AndroidManifest.xml -S res -A assets -I "$ANDROID_HOME/platforms/android-35/android.jar" -F build/unsigned.apk
+          cp build/dex/classes.dex .
+          "$BT/aapt" add build/unsigned.apk classes.dex >/dev/null
+          rm classes.dex
+          "$BT/zipalign" -f -p 4 build/unsigned.apk build/aligned.apk
+          keytool -genkeypair -noprompt -keystore build/ibo.keystore -storepass iboalan27 -keypass iboalan27 -alias ibo -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=IBO Alan Tarama,O=IBO,C=TR" >/dev/null 2>&1
+          "$BT/apksigner" sign --ks build/ibo.keystore --ks-key-alias ibo --ks-pass pass:iboalan27 --key-pass pass:iboalan27 --out build/IBO-Alan-Tarama-v29-AR.apk build/aligned.apk
+          "$BT/apksigner" verify --verbose --print-certs build/IBO-Alan-Tarama-v29-AR.apk
+          "$BT/aapt" dump badging build/IBO-Alan-Tarama-v29-AR.apk | head -8
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: IBO-Alan-Tarama-v29-AR
+          path: work/build/IBO-Alan-Tarama-v29-AR.apk
+          if-no-files-found: error
